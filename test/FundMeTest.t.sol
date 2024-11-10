@@ -8,49 +8,52 @@ import {console} from "../lib/forge-std/src/console.sol";
 import {FundMe} from "../src/FundMe.sol";
 import {DeployFundMe} from "../script/DeployFundMe.s.sol";
 
+/**
+ * @title FundMeTest
+ * @notice This contract contains tests for the FundMe contract.
+ */
 contract FundMeTest is Test {
     FundMe fundMe;
 
     address USER = makeAddr("user");
-    uint256 constant SEND_VALUE = 2e18;
-    uint256 constant FUND_BAL = 100e18;
+    uint256 constant SEND_VALUE = 2e18; // Amount to send for funding
+    uint256 constant FUND_BAL = 100e18; // Total balance for funding
 
     function setUp() external {
-        // fundMe = new FundMe(0x694AA1769357215DE4FAC081bf1f309aDC325306);
-        fundMe = new DeployFundMe().run();
+        fundMe = new DeployFundMe().run(); // Deploy the FundMe contract
     }
 
     function testMinimumDolarIsFive() external view {
-        assertEq(fundMe.MINIMUM_USD(), 5e18);
+        assertEq(fundMe.MINIMUM_USD(), 5e18); // Test minimum funding amount
         console.log("hello");
     }
 
     function testOwnerIsMsgSender() public view {
-        assertEq(fundMe.getOnwer(), msg.sender);
+        assertEq(fundMe.getOnwer(), msg.sender); // Test that the owner is the message sender
     }
 
     function testPriceFeedVersion() public view {
-        assertEq(fundMe.getVersion(), 4);
+        assertEq(fundMe.getVersion(), 4); // Test the price feed version
     }
 
     function testFundFailsWithoutEnoughEth() public {
-        vm.expectRevert("You need to spend more ETH!");
+        vm.expectRevert("You need to spend more ETH!"); // Expect revert for insufficient ETH
         fundMe.fund{value: 0}();
     }
 
     function testFundUpdatesFundedDataStructure() public {
-        vm.prank(USER); // make the user address
-        vm.deal(USER, FUND_BAL); // give the user 100 eth
+        vm.prank(USER); // Simulate user funding
+        vm.deal(USER, FUND_BAL); // Give the user 100 ETH
         fundMe.fund{value: SEND_VALUE}();
-        assertEq(fundMe.getAddressToAmountFunded(USER), SEND_VALUE);
-        assertEq(fundMe.getFunder(0), USER);
+        assertEq(fundMe.getAddressToAmountFunded(USER), SEND_VALUE); // Check funded amount
+        assertEq(fundMe.getFunder(0), USER); // Check funder address
     }
 
     function testAddsFunderToArrayOfFunders() public {
         vm.prank(USER);
         vm.deal(USER, FUND_BAL);
         fundMe.fund{value: SEND_VALUE}();
-        assertEq(fundMe.getFunder(0), USER);
+        assertEq(fundMe.getFunder(0), USER); // Check if user is added to funders
     }
 
     modifier funded() {
@@ -61,52 +64,44 @@ contract FundMeTest is Test {
     }
 
     function testOnlyOwnerCanWithdraw() public funded {
-        vm.prank(USER);
-        vm.expectRevert();
+        vm.prank(USER); // Simulate a non-owner trying to withdraw
+        vm.expectRevert(); // Expect revert for non-owner
         fundMe.withdraw();
     }
 
     function testWithdrawWithASingleFunder() public funded {
-        // Arange
-        uint256 startingOwnerBalance = fundMe.getOnwer().balance;
-        uint256 startingFundMeBalance = address(fundMe).balance;
+        uint256 startingOwnerBalance = fundMe.getOnwer().balance; // Owner's starting balance
+        uint256 startingFundMeBalance = address(fundMe).balance; // FundMe's starting balance
 
-        // Act
         vm.prank(fundMe.getOnwer());
-        fundMe.withdraw();
+        fundMe.withdraw(); // Owner withdraws funds
 
-        // Assert
-        uint256 endingOwnerBalance = fundMe.getOnwer().balance;
-        uint256 endingFundMeBalance = address(fundMe).balance;
-        assertEq(endingFundMeBalance, 0);
-        assertEq(startingFundMeBalance + startingOwnerBalance, endingOwnerBalance);
-
+        uint256 endingOwnerBalance = fundMe.getOnwer().balance; // Owner's ending balance
+        uint256 endingFundMeBalance = address(fundMe).balance; // FundMe's ending balance
+        assertEq(endingFundMeBalance, 0); // Check FundMe balance is zero
+        assertEq(startingFundMeBalance + startingOwnerBalance, endingOwnerBalance); // Check total balance
     }
 
     function testWithdrawWithAMultipleFunder() public funded {
-        // Arrange
-        uint160 numberOfFunders = 10;
-        uint160 startingFundedIndex = 1;
-        for(uint160 i = startingFundedIndex; i < numberOfFunders; i++){
-            // hoax is a forge-std that generate and fund and address
-            hoax(address(i), SEND_VALUE);
-            fundMe.fund{value: SEND_VALUE}();
+        uint160 numberOfFunders = 10; // Number of funders
+        uint160 startingFundedIndex = 1; // Starting index for funders
+        for (uint160 i = startingFundedIndex; i < numberOfFunders; i++) {
+            hoax(address(i), SEND_VALUE); // Generate and fund an address
+            fundMe.fund{value: SEND_VALUE}(); // Fund the contract
         }
 
-        uint256 startingOwnerBalance = fundMe.getOnwer().balance;
-        uint256 startingFundMeBalance = address(fundMe).balance;
+        uint256 startingOwnerBalance = fundMe.getOnwer().balance; // Owner's starting balance
+        uint256 startingFundMeBalance = address(fundMe).balance; // FundMe's starting balance
         uint256 endingOwnerBalance;
         uint256 endingFundmeBalance;
 
-        // Action
         vm.startPrank(fundMe.getOnwer());
-        fundMe.withdraw();
-        endingFundmeBalance = address(fundMe).balance;
-        endingOwnerBalance = fundMe.getOnwer().balance;
+        fundMe.withdraw(); // Owner withdraws funds
+        endingFundmeBalance = address(fundMe).balance; // FundMe's ending balance
+        endingOwnerBalance = fundMe.getOnwer().balance; // Owner's ending balance
         vm.stopPrank();
 
-        // Assert
-        assertEq(endingFundmeBalance, 0);
-        assertEq(startingFundMeBalance + startingOwnerBalance, endingOwnerBalance);
+        assertEq(endingFundmeBalance, 0); // Check FundMe balance is zero
+        assertEq(startingFundMeBalance + startingOwnerBalance, endingOwnerBalance); // Check total balance
     }
 }
